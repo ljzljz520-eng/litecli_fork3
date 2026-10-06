@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Generator, Iterable, Literal
+from collections.abc import Generator, Iterable
+from typing import Literal
 
 import sqlparse
 from sqlparse.sql import Function, Identifier, IdentifierList, Token, TokenList
@@ -90,17 +91,13 @@ def extract_from_part(parsed: TokenList, stop_at_punctuation: bool = True) -> Ge
             if is_subselect(item):
                 for x in extract_from_part(item, stop_at_punctuation):
                     yield x
-            elif stop_at_punctuation and item.ttype is Punctuation:
-                return
-            # An incomplete nested select won't be recognized correctly as a
-            # sub-select. eg: 'SELECT * FROM (SELECT id FROM user'. This causes
-            # the second FROM to trigger this elif condition resulting in a
-            # `return`. So we need to ignore the keyword if the keyword
-            # FROM.
-            # Also 'SELECT * FROM abc JOIN def' will trigger this elif
-            # condition. So we need to ignore the keyword JOIN and its variants
-            # INNER JOIN, FULL OUTER JOIN, etc.
-            elif item.ttype is Keyword and (not item.value.upper() == "FROM") and (not item.value.upper().endswith("JOIN")):
+            elif (
+                stop_at_punctuation
+                and item.ttype is Punctuation
+                or item.ttype is Keyword
+                and (not item.value.upper() == "FROM")
+                and (not item.value.upper().endswith("JOIN"))
+            ):
                 return
             else:
                 yield item

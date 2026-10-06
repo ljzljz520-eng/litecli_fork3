@@ -95,6 +95,41 @@ keyword_casing = auto
 # disabled pager on startup
 enable_pager = True
 
+# Per-statement execution budgets. A value of 0 means unlimited, which keeps
+# the historical unbounded behavior. Each statement in a multi-statement
+# batch gets its own context and counters.
+
+# Wall-clock budget per statement, in seconds.
+execution_budget_wall_seconds = 0
+
+# SQLite virtual-machine (bytecode) step budget per statement.
+execution_budget_vm_steps = 0
+
+# Maximum number of result rows one statement may emit.
+execution_budget_output_rows = 0
+
+# Maximum output payload size one statement may emit, in bytes.
+execution_budget_output_bytes = 0
+
+# Maximum temporary disk space one statement may use, in bytes.
+execution_budget_temp_bytes = 0
+
+# SQLite progress-handler tick interval in VM instructions. Smaller values
+# give more precise cancellation; larger values reduce callback overhead.
+progress_handler_interval = 1000
+
+# How long to wait on a locked database before aborting the statement, in
+# milliseconds. 0 = wait indefinitely (still subject to the other budgets).
+lock_wait_timeout_ms = 0
+
+# What to do with the remaining statements in a multi-statement batch when
+# one statement is cancelled:
+#   stop     - do not execute any remaining statements (default)
+#   continue - skip the cancelled statement and execute the rest
+#   rollback - roll back the current transaction, then stop
+# A second Ctrl-C always aborts the whole batch, regardless of this setting.
+batch_cancel_policy = stop
+
 # Custom colors for the completion menu, toolbar, etc.
 [colors]
 completion-menu.completion.current = 'bg:#ffffff #000000'

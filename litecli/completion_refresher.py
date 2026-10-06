@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import threading
 from collections import OrderedDict
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from .packages.special.main import COMMANDS
 from .sqlcompleter import SQLCompleter
 from .sqlexecute import SQLExecute
 
 
-class CompletionRefresher(object):
+class CompletionRefresher:
     refreshers: dict[str, Callable] = OrderedDict()
 
     def __init__(self) -> None:

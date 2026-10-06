@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import logging
 from collections import namedtuple
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from . import export
 
@@ -54,7 +56,7 @@ class Verbosity(Enum):
 
 
 @export
-def parse_special_command(sql: str) -> tuple[str, "Verbosity", str]:
+def parse_special_command(sql: str) -> tuple[str, Verbosity, str]:
     """
     Parse a special command, extracting the base command name, verbosity
     (normal, verbose (+), or succinct (-)), and the remaining argument.

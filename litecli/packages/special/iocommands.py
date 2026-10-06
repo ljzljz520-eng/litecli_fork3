@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import builtins
 import locale
 import logging
 import os
 import re
 import shlex
 import subprocess
-from io import open
+from collections.abc import Generator
 from time import sleep
-from typing import Any, Generator, TextIO
+from typing import Any, TextIO
 
 import click
 import sqlparse
@@ -144,9 +145,9 @@ def open_external_editor(filename: str | None = None, sql: str | None = None) ->
         filename = filename.strip().split(" ", 1)[0]
         click.edit(filename=filename)
         try:
-            with open(filename, encoding="utf-8") as f:
+            with builtins.open(filename, encoding="utf-8") as f:
                 text = f.read()
-        except IOError:
+        except OSError:
             message = f"Error reading file: {filename}."
             text = sql
         return (text, message)
@@ -333,9 +334,9 @@ def set_tee(arg: str, **_: Any) -> list[tuple]:
         file, mode = parseargfile(arg)
         from typing import cast
 
-        tee_file = cast(TextIO, open(file, mode))
-    except (IOError, OSError) as e:
-        raise OSError("Cannot write to file '{}': {}".format(e.filename, e.strerror))
+        tee_file = cast(TextIO, builtins.open(file, mode))
+    except OSError as e:
+        raise OSError(f"Cannot write to file '{e.filename}': {e.strerror}")
 
     return [(None, None, None, "")]
 
@@ -375,9 +376,9 @@ def set_once(arg: str, **_: Any) -> list[tuple]:
         file, mode = parseargfile(arg)
         from typing import cast
 
-        once_file = cast(TextIO, open(file, mode))
-    except (IOError, OSError) as e:
-        raise OSError("Cannot write to file '{}': {}".format(e.filename, e.strerror))
+        once_file = cast(TextIO, builtins.open(file, mode))
+    except OSError as e:
+        raise OSError(f"Cannot write to file '{e.filename}': {e.strerror}")
     written_to_once_file = False
 
     return [(None, None, None, "")]
@@ -434,9 +435,9 @@ def write_pipe_once(output: str) -> None:
         try:
             click.echo(output, file=pipe_once_process.stdin, nl=False)
             click.echo("\n", file=pipe_once_process.stdin, nl=False)
-        except (IOError, OSError) as e:
+        except OSError as e:
             pipe_once_process.terminate()
-            raise OSError("Failed writing to pipe_once subprocess: {}".format(e.strerror))
+            raise OSError(f"Failed writing to pipe_once subprocess: {e.strerror}")
         written_to_pipe_once_process = True
 
 
@@ -486,7 +487,7 @@ def watch_query(arg: str, **kwargs: Any) -> Generator[tuple, None, None]:
         if current_arg == "-c":
             clear_screen = True
             continue
-        statement = "{0!s} {1!s}".format(current_arg, arg)
+        statement = f"{current_arg!s} {arg!s}"
     destructive_prompt = confirm_destructive_query(statement)
     if destructive_prompt is False:
         click.secho("Wise choice!")
@@ -494,7 +495,7 @@ def watch_query(arg: str, **kwargs: Any) -> Generator[tuple, None, None]:
     elif destructive_prompt is True:
         click.secho("Your call!")
     cur = kwargs["cur"]
-    sql_list = [(sql.rstrip(";"), "> {0!s}".format(sql)) for sql in sqlparse.split(statement)]
+    sql_list = [(sql.rstrip(";"), f"> {sql!s}") for sql in sqlparse.split(statement)]
     old_pager_enabled = is_pager_enabled()
     while True:
         if clear_screen:

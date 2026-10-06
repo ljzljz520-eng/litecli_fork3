@@ -182,13 +182,12 @@ def output(monkeypatch, terminal_size, testdata, explicit_pager, expect_pager):
     monkeypatch.setattr(click, "echo_via_pager", echo_via_pager)
     monkeypatch.setattr(click, "secho", secho)
     m.output(testdata)
-    if clickoutput.endswith("\n"):
-        clickoutput = clickoutput[:-1]
+    clickoutput = clickoutput.removesuffix("\n")
     assert clickoutput == "\n".join(testdata)
 
 
 def test_conditional_pager(monkeypatch):
-    testdata = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do".split(" ")
+    testdata = ["Lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit", "sed", "do"]
     # User didn't set pager, output doesn't fit screen -> pager
     output(
         monkeypatch,

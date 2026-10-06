@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 import sqlparse
-from sqlparse.sql import Comparison, Identifier, Where, Token
-from .parseutils import last_word, extract_tables, find_prev_keyword
+from sqlparse.sql import Comparison, Identifier, Token, Where
+
+from .parseutils import extract_tables, find_prev_keyword, last_word
 from .special.main import parse_special_command
 
 
@@ -73,13 +74,16 @@ def suggest_type(full_text: str, text_before_cursor: str) -> list[dict[str, Any]
         # Be careful here because trivial whitespace is parsed as a statement,
         # but the statement won't have a first token
         tok1 = statement.token_first()
-        if tok1 and tok1.value.startswith("."):
-            return suggest_special(text_before_cursor)
-        elif tok1 and tok1.value.startswith("\\"):
-            return suggest_special(text_before_cursor)
-        elif tok1 and tok1.value.startswith("source"):
-            return suggest_special(text_before_cursor)
-        elif text_before_cursor and text_before_cursor.startswith(".open "):
+        if (
+            tok1
+            and tok1.value.startswith(".")
+            or tok1
+            and tok1.value.startswith("\\")
+            or tok1
+            and tok1.value.startswith("source")
+            or text_before_cursor
+            and text_before_cursor.startswith(".open ")
+        ):
             return suggest_special(text_before_cursor)
 
     last_token = statement and statement.token_prev(len(statement.tokens))[1] or ""

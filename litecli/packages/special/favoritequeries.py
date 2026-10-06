@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import builtins
 from typing import Any, cast
 
 
-class FavoriteQueries(object):
+class FavoriteQueries:
     section_name: str = "favorite_queries"
 
     usage = """

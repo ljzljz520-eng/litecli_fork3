@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """Test the litecli.clistyle module."""
 
 import pytest

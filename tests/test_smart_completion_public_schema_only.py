@@ -1,7 +1,3 @@
-# coding: utf-8
-
-from __future__ import unicode_literals
-
 from unittest.mock import patch
 
 import pytest
@@ -18,7 +14,7 @@ metadata = {
 
 @pytest.fixture
 def completer():
-    import litecli.sqlcompleter as sqlcompleter
+    from litecli import sqlcompleter
 
     comp = sqlcompleter.SQLCompleter()
 

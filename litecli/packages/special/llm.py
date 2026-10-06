@@ -306,11 +306,7 @@ def handle_llm(text: str, cur: DBCursor) -> tuple[str, str, float]:
         restart = True
     # If the parts starts with any of the known LLM_CLI_COMMANDS then invoke
     # the llm and don't capture output. This is to handle commands like `models` or `keys`.
-    elif parts[0] in LLM_CLI_COMMANDS:
-        capture_output = False
-        use_context = False
-    # If the user wants to use --help option to see each command and it's description
-    elif "--help" == parts[0]:
+    elif parts[0] in LLM_CLI_COMMANDS or "--help" == parts[0]:
         capture_output = False
         use_context = False
     # If the parts doesn't have any known LLM_CLI_COMMANDS then the user is

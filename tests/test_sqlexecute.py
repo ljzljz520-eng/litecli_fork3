@@ -344,14 +344,14 @@ def test_system_command_not_found(executor):
 def test_system_command_output(executor):
     test_dir = os.path.abspath(os.path.dirname(__file__))
     test_file_path = os.path.join(test_dir, "test.txt")
-    results = run(executor, "system cat {0}".format(test_file_path))
+    results = run(executor, f"system cat {test_file_path}")
     assert_result_equal(results, status="litecli is awesome!\n")
 
 
 @dbtest
 def test_cd_command_current_dir(executor):
     test_path = os.path.abspath(os.path.dirname(__file__))
-    run(executor, "system cd {0}".format(test_path))
+    run(executor, f"system cd {test_path}")
     assert os.getcwd() == test_path
     run(executor, "system cd ..")
 

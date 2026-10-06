@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Collection, Generator, Iterable, Sequence
 from re import compile, escape
-from typing import Any, Collection, Generator, Iterable, Literal, Sequence
+from typing import Any, Literal
 
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.completion.base import Document

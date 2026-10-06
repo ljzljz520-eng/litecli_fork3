@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 import click
 
 from .parseutils import is_destructive
-from typing import Any
 
 
 class ConfirmBoolParamType(click.ParamType):

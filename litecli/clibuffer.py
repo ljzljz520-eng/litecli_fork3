@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from prompt_toolkit.application import get_app
 from prompt_toolkit.enums import DEFAULT_BUFFER
 from prompt_toolkit.filters import Condition, Filter
-from prompt_toolkit.application import get_app
 
 
 def cli_is_multiline(cli: Any) -> Filter:

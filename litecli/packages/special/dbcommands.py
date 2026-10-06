@@ -3,15 +3,15 @@ from __future__ import annotations
 import csv
 import logging
 import os
-import sys
 import platform
 import shlex
+import sys
 from typing import Any, cast
-
 
 from litecli import __version__
 from litecli.packages.special import iocommands
-from .main import special_command, RAW_QUERY, PARSED_QUERY
+
+from .main import PARSED_QUERY, RAW_QUERY, special_command
 from .types import DBCursor
 
 log = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def list_tables(
     verbose: bool = False,
 ) -> list[tuple]:
     if arg:
-        args: tuple[str, ...] = ("{0}%".format(arg),)
+        args: tuple[str, ...] = (f"{arg}%",)
         query = """
             SELECT name FROM sqlite_master
             WHERE type IN ('table','view') AND name LIKE ? AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sqlean_%'
@@ -79,7 +79,7 @@ def list_views(
     verbose: bool = False,
 ) -> list[tuple]:
     if arg:
-        args: tuple[str, ...] = ("{0}%".format(arg),)
+        args: tuple[str, ...] = (f"{arg}%",)
         query = """
             SELECT name FROM sqlite_master
             WHERE type = 'view' AND name LIKE ? AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'sqlean_%'
@@ -172,7 +172,7 @@ def list_indexes(
     verbose: bool = False,
 ) -> list[tuple]:
     if arg:
-        args: tuple[str, ...] = ("{0}%".format(arg),)
+        args: tuple[str, ...] = (f"{arg}%",)
         query = """
             SELECT name, sql FROM sqlite_master
             WHERE type = 'index' AND tbl_name LIKE ? AND name NOT LIKE 'sqlite_%'
@@ -214,8 +214,8 @@ def status(cur: DBCursor, **_: Any) -> list[tuple]:
     implementation = platform.python_implementation()
     version = platform.python_version()
     client_info = []
-    client_info.append("litecli {0},".format(__version__))
-    client_info.append("running on {0} {1}".format(implementation, version))
+    client_info.append(f"litecli {__version__},")
+    client_info.append(f"running on {implementation} {version}")
     footer.append(" ".join(client_info))
 
     # Build the output that will be displayed as a table.
@@ -267,9 +267,9 @@ def load_extension(cur: DBCursor, arg: str, **_: Any) -> list[tuple]:
 )
 def describe(cur: DBCursor, arg: str | None, **_: Any) -> list[tuple]:
     if arg:
-        query = """
-            PRAGMA table_info({})
-        """.format(arg)
+        query = f"""
+            PRAGMA table_info({arg})
+        """
     else:
         return cast(list[tuple[Any, ...]], list_tables(cur))
 

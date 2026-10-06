@@ -1,5 +1,17 @@
 ## Unreleased
 
+### Features
+
+- Add per-statement `ExecutionContext` with configurable budgets for wall
+  time, SQLite VM steps, output rows/bytes and temporary disk; statements are
+  aborted proactively through the SQLite progress handler and a busy handler
+  (native on Python 3.13+, emulated on older runtimes) distinguishes lock
+  waits. A `running/cancelling/interrupted/completed/failed` state machine
+  tracks lifecycle, transactions are modeled as tainted after an aborted
+  COMMIT or irrecoverable errors, multi-statement batches support
+  `stop/continue/rollback` cancel policies, and the bottom toolbar displays
+  remaining budgets and transaction state.
+
 ### Bug Fixes
 
 - Expand `~` in configured log file paths before opening the log.

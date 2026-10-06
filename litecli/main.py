@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import itertools
 import logging
 import os
@@ -9,10 +10,10 @@ import sys
 import threading
 import traceback
 from collections import namedtuple
+from collections.abc import Generator, Iterable
 from datetime import datetime
-from io import open
 from time import time
-from typing import Any, Generator, Iterable, Literal, TextIO, cast
+from typing import Any, Literal, TextIO, cast
 
 import click
 import sqlparse
@@ -37,6 +38,7 @@ from .clistyle import style_factory, style_factory_output
 from .clitoolbar import create_toolbar_tokens_func
 from .completion_refresher import CompletionRefresher
 from .config import config_location, ensure_dir_exists, get_config
+from .execution import Budget, ExecutionLimit, TransactionTaintedError, parse_policy
 from .key_bindings import cli_bindings
 from .lexer import LiteCliLexer
 from .packages import special
@@ -67,7 +69,7 @@ Query = namedtuple("Query", ["query", "successful", "mutating"])
 PACKAGE_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
-class LiteCli(object):
+class LiteCli:
     default_prompt = "\\d> "
     max_len_prompt = 45
 
@@ -91,7 +93,7 @@ class LiteCli(object):
         special.set_favorite_queries(self.config)
         self.formatter = TabularOutputFormatter(format_name=c["main"]["table_format"])
         # self.formatter.litecli = self, ty raises unresolved-attribute, hence use dynamic assignment
-        setattr(self.formatter, "litecli", self)
+        self.formatter.litecli = self
         self.syntax_style = c["main"]["syntax_style"]
         self.less_chatty = c["main"].as_bool("less_chatty")
         self.show_bottom_toolbar = c["main"].as_bool("show_bottom_toolbar")
@@ -109,8 +111,8 @@ class LiteCli(object):
         # audit log
         if self.logfile is None and "audit_log" in c["main"]:
             try:
-                self.logfile = open(os.path.expanduser(c["main"]["audit_log"]), "a")
-            except (IOError, OSError):
+                self.logfile = builtins.open(os.path.expanduser(c["main"]["audit_log"]), "a")
+            except OSError:
                 self.echo(
                     "Error: Unable to open the audit log file. Your queries will not be logged.",
                     err=True,
@@ -191,11 +193,11 @@ class LiteCli(object):
     def change_table_format(self, arg: str, **_: Any) -> Generator[tuple[None, None, None, str], None, None]:
         try:
             self.formatter.format_name = arg
-            yield (None, None, None, "Changed table format to {}".format(arg))
+            yield (None, None, None, f"Changed table format to {arg}")
         except ValueError:
-            msg = "Table format {} not recognized. Allowed formats:".format(arg)
+            msg = f"Table format {arg} not recognized. Allowed formats:"
             for table_type in self.formatter.supported_formats:
-                msg += "\n\t{}".format(table_type)
+                msg += f"\n\t{table_type}"
             yield (None, None, None, msg)
 
     def change_db(self, arg: str | None, **_: Any) -> Iterable[tuple]:
@@ -222,9 +224,9 @@ class LiteCli(object):
             message = "Missing required argument, filename."
             return [(None, None, None, message)]
         try:
-            with open(os.path.expanduser(arg), encoding="utf-8") as f:
+            with builtins.open(os.path.expanduser(arg), encoding="utf-8") as f:
                 query = f.read()
-        except IOError as e:
+        except OSError as e:
             return [(None, None, None, str(e))]
 
         if self.destructive_warning and confirm_destructive_query(query) is False:
@@ -275,7 +277,7 @@ class LiteCli(object):
             handler = logging.FileHandler(log_file)
         else:
             self.echo(
-                'Error: Unable to open the log file "{}".'.format(log_file),
+                f'Error: Unable to open the log file "{log_file}".',
                 err=True,
                 fg="red",
             )
@@ -336,6 +338,27 @@ class LiteCli(object):
             self.echo(str(e), err=True, fg="red")
             exit(1)
 
+        self.apply_execution_settings()
+
+    def apply_execution_settings(self) -> None:
+        """Push budget, lock-wait and batch-policy settings to the executor."""
+        section = self.config["main"]
+
+        budget = Budget.from_config_section(section)
+        policy = parse_policy(section.get("batch_cancel_policy", "stop"))
+        interval = int(section.get("progress_handler_interval", "1000") or 1000)
+        lock_ms = float(section.get("lock_wait_timeout_ms", "0") or 0)
+
+        assert self.sqlexecute is not None
+        self.sqlexecute.configure(
+            budget=budget,
+            batch_policy=policy,
+            progress_interval=interval,
+            lock_wait_timeout=(lock_ms / 1000.0) if lock_ms > 0 else None,
+        )
+        # Safety notices from the executor (policy rollback, ...) surface here.
+        self.sqlexecute.notice = lambda message, **kwargs: self.echo(message, **kwargs)
+
     def handle_editor_command(self, text: str) -> str:
         R"""Editor command is any query that is prefixed or suffixed by a '\e'.
         The reason for a while loop is because a user might edit a query
@@ -384,7 +407,7 @@ class LiteCli(object):
         else:
             history = None
             self.echo(
-                'Error: Unable to open the history file "{}". Your query history will not be saved.'.format(history_file),
+                f'Error: Unable to open the history file "{history_file}". Your query history will not be saved.',
                 err=True,
                 fg="red",
             )
@@ -419,7 +442,7 @@ class LiteCli(object):
                 threshold = 1000
                 if is_select(status) and cur and cur.rowcount > threshold:
                     self.echo(
-                        "The result set has more than {} rows.".format(threshold),
+                        f"The result set has more than {threshold} rows.",
                         fg="red",
                     )
                     if not confirm("Do you want to continue?"):
@@ -435,16 +458,19 @@ class LiteCli(object):
                 formatted = self.format_output(title, cur, headers, special.is_expanded_output(), max_width)
 
                 t = time() - start
-                try:
-                    if result_count > 0:
-                        self.echo("")
+                if result_count > 0:
                     try:
-                        self.output(formatted, status)
+                        self.echo("")
                     except KeyboardInterrupt:
                         pass
-                    self.echo("Time: %0.03fs" % t)
+                try:
+                    self.output(formatted, status)
                 except KeyboardInterrupt:
-                    pass
+                    # Output phase: the statement already ran, so cancel the
+                    # remaining statements of the batch; the next pull on res
+                    # raises ExecutionLimit through run()'s abort pipeline.
+                    sqlexecute.request_cancel()
+                self.echo("Time: %0.03fs" % t)
 
                 start = time()
                 result_count += 1
@@ -524,7 +550,7 @@ class LiteCli(object):
                 start = time()
                 res = sqlexecute.run(text)
                 # Set query attribute dynamically on formatter
-                setattr(self.formatter, "query", text)
+                self.formatter.query = text
                 successful = True
                 special.unset_once_if_written()
                 # Keep track of whether or not the query is mutating. In case
@@ -534,15 +560,21 @@ class LiteCli(object):
                 special.unset_pipe_once_if_written()
             except EOFError as e:
                 raise e
+            except ExecutionLimit as e:
+                # The abort pipeline inside run() already handled taint,
+                # batch policy and any policy ROLLBACK.
+                logger.debug("cancelled query: %s", e.reason)
+                self.echo(str(e), err=True, fg="red")
+            except TransactionTaintedError as e:
+                self.echo(str(e), err=True, fg="red")
             except KeyboardInterrupt:
+                # Ctrl-C landed outside of statement execution (logging, tee,
+                # an echo ...): route through the same cancel protocol.
                 try:
-                    # since connection can be sqlite3 or sqlean, it's hard to annotate the type for interrupt. so ignore the type hint warning.
-                    conn = sqlexecute.conn
-                    if conn is not None:
-                        conn.interrupt()  # type: ignore[attr-defined]
+                    sqlexecute.request_cancel()
                 except Exception as e:
                     self.echo(
-                        "Encountered error while cancelling query: {}".format(e),
+                        f"Encountered error while cancelling query: {e}",
                         err=True,
                         fg="red",
                     )
@@ -818,7 +850,7 @@ class LiteCli(object):
             r"\_": " ",
         }
         # Compile a regex pattern that matches any of the keys in replacements
-        pattern = re.compile("|".join(re.escape(key) for key in replacements.keys()))
+        pattern = re.compile("|".join(re.escape(key) for key in replacements))
 
         # Define the replacement function
         def replacer(match: re.Match[str]) -> str:
@@ -833,7 +865,7 @@ class LiteCli(object):
         results = self.sqlexecute.run(query)
         for result in results:
             title, cur, headers, status = result
-            setattr(self.formatter, "query", query)
+            self.formatter.query = query
             output = self.format_output(title, cur, headers)
             for line in output:
                 click.echo(line, nl=new_line)
@@ -910,7 +942,7 @@ class LiteCli(object):
     "-R",
     "--prompt",
     "prompt",
-    help='Prompt format (Default: "{0}").'.format(LiteCli.default_prompt),
+    help=f'Prompt format (Default: "{LiteCli.default_prompt}").',
 )
 @click.option(
     "-l",
@@ -989,7 +1021,7 @@ def cli(
         stdin_text = stdin.read()
 
         try:
-            sys.stdin = open("/dev/tty")
+            sys.stdin = builtins.open("/dev/tty")
         except (FileNotFoundError, OSError):
             litecli.logger.warning("Unable to open TTY as stdin.")
 
